@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/little-window/",
-      "destination": "/little-window/index.html"
+      "destination": "/little-window/home.html"
     },
     {
       "source": "/((?!api/).*)",

@@ -1,7 +1,7 @@
 {
   "name": "Little Window · شباك صغير",
   "short_name": "Little Window",
-  "start_url": "./", "scope": "./",
+  "start_url": "/little-window/", "scope": "/little-window/",
   "display": "standalone",
   "background_color": "#FFF4C7",
   "theme_color": "#FFF4C7",
