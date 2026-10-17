@@ -1,3 +1,38 @@
+# where was i? (كنت فين؟)
+
+A free, mobile-first, ADHD-friendly companion for everyday life — groceries,
+calls, messages, appointments, errands, home, work and creative projects.
+Egyptian Arabic by default, with an English toggle. Built on JumpyBrain (see
+[NOTICE.md](./NOTICE.md)).
+
+- **Runs with no server, no account, no paid service.** Everything is saved on
+  the device (IndexedDB) and works offline after the first visit.
+- **Data stays on one device.** It does not sync between your phone and your
+  laptop. Use *More → Backup* to export a file (or copy the backup as text) and
+  restore it on another device.
+- What it does: one-field quick capture (with optional voice), a calm Today
+  screen, "What next?" with visible reasons, optional energy check-in, tiny
+  steps, 2/5/15/25-minute gentle timer, recurring items, waiting-for, later,
+  project memory (last action, next tiny step, notes, links), search, filters,
+  undo, archive, a recoverable Deleted list, daily automatic copies, stickers.
+
+## Run it on your computer
+
+```bash
+cd frontend
+npm install
+npm run dev          # open the address it prints
+npm test             # logic tests
+npm run build        # production build in frontend/dist
+npx vite preview --port 4173 & npm run test:e2e   # browser tests (needs Python Playwright)
+```
+
+Deploying for free: see [DEPLOY-ar.md](./DEPLOY-ar.md).
+
+---
+
+## The original JumpyBrain README follows
+
 # JumpyBrain — Focus better. Do more. Feel calm.
 
 JumpyBrain is a productivity application built specifically for people with ADHD/ADD. It combines smart task management, focus tools, mindfulness exercises, and rule-based task ranking to help you stay on track — without overwhelming you. OpenAI is used to draft tasks from a brain dump, not to choose what you do next.

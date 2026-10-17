@@ -24,4 +24,4 @@ dist-ssr
 *.sw?
 
 # Misc
-.env
+.envdist-demo/

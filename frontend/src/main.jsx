@@ -1,16 +1,14 @@
+// where was i? — entry point.
+// The original JumpyBrain web app (src/App.jsx and src/components/) needs its
+// own server, MongoDB and Google sign-in. It is kept in the repository
+// unchanged, but this local-first app is what gets built and served.
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom';
-import './styles.css'
-import App from './App.jsx'
-import { UserProvider } from './contexts/UserContext.jsx'
+import './wwi/wwi.css'
+import WhereWasI from './wwi/App.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter>
-      <UserProvider>
-        <App />
-      </UserProvider>
-    </BrowserRouter>
+    <WhereWasI />
   </StrictMode>,
 )

@@ -1,5 +1,5 @@
 {
-  "name": "jumpybrain",
+  "name": "where-was-i",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/logic.test.js",
+    "test:e2e": "python3 tests/e2e.py http://localhost:4173/",
+    "build:demo": "DEMO=1 vite build"
   },
   "dependencies": {
     "@capacitor/android": "^6.0.0",
