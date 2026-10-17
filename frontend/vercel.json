@@ -6,6 +6,10 @@
   "installCommand": "npm install",
   "rewrites": [
     {
+      "source": "/lw",
+      "destination": "/little-window/home.html"
+    },
+    {
       "source": "/little-window",
       "destination": "/little-window/home.html"
     },
