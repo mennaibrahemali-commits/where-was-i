@@ -6,7 +6,7 @@
 // Changes here: runs on the device (no server), uses three energy levels plus
 // "skip", adds available time, resume and preferred-area factors, and returns
 // the reasons so the app can always explain its pick.
-import { daysBetween, firstOpenStep, isActive } from './model.js';
+import { daysBetween, firstOpenStep, isActive, isLife } from './model.js';
 import { guessEnergyNeed } from './classify.js';
 
 const ENERGY_RANK = { low: 0, normal: 1, high: 2 };
@@ -115,7 +115,7 @@ export function scoreItem(it, ctx) {
 export function rankWhatNext(items, ctx) {
   const skipped = ctx.skipped || new Set();
   return items
-    .filter((it) => isActive(it) && !skipped.has(it.id) && it.title.trim())
+    .filter((it) => isActive(it) && isLife(it) && !skipped.has(it.id) && it.title.trim())
     .map((it) => scoreItem(it, ctx))
     .sort((a, b) => b.score - a.score || a.item.createdAt.localeCompare(b.item.createdAt));
 }
@@ -127,7 +127,7 @@ export function pickWhatNext(items, ctx) {
 // Small, quick, low-friction items for the "quick wins" corner.
 export function quickWins(items, today, excludeId, limit = 3) {
   return items
-    .filter((it) => isActive(it) && it.id !== excludeId && !it.isProject && it.title.trim())
+    .filter((it) => isActive(it) && isLife(it) && it.id !== excludeId && !it.isProject && it.title.trim())
     .filter((it) => defaultEstimate(it) <= 10 || ['groceries', 'messages', 'calls'].includes(it.area))
     .map((it) => ({ it, u: urgencyOf(it, today).value }))
     .sort((a, b) => b.u - a.u)
@@ -137,14 +137,14 @@ export function quickWins(items, today, excludeId, limit = 3) {
 
 // The one thing that was left half-way: most recently touched, still open.
 export function resumeCandidate(items) {
-  const open = items.filter((it) => (it.status === 'open') && (it.touchedAt || it.startedAt) && (it.lastAction || it.nextStep || it.steps.some((s) => s.done) || it.startedAt));
+  const open = items.filter((it) => (it.status === 'open') && isLife(it) && (it.touchedAt || it.startedAt) && (it.lastAction || it.nextStep || it.steps.some((s) => s.done) || it.startedAt));
   open.sort((a, b) => (b.touchedAt || b.startedAt).localeCompare(a.touchedAt || a.startedAt));
   return open[0] || null;
 }
 
 export function comingUp(items, today, excludeIds = [], limit = 3) {
   return items
-    .filter((it) => isActive(it) && it.dueAt && !excludeIds.includes(it.id))
+    .filter((it) => isActive(it) && isLife(it) && it.dueAt && !excludeIds.includes(it.id))
     .filter((it) => daysBetween(today, it.dueAt) <= 3)
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
     .slice(0, limit);

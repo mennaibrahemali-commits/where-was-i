@@ -5,11 +5,16 @@ import { ItemRow } from './ItemRow.jsx';
 import { AREAS } from '../lib/model.js';
 import { normalizeText } from '../lib/classify.js';
 import { formatNumber } from '../i18n.js';
+import Projects from './Projects.jsx';
 
-const FILTERS = ['open', 'inbox', 'waiting', 'later', 'done', 'archived', 'trash'];
+const FILTERS = ['open', 'inbox', 'projects', 'waiting', 'later', 'done', 'archived', 'trash'];
 
+// Work has its own board; here it only shows up in Archive and Deleted.
 function matches(it, filter) {
+  if (filter === 'archived' || filter === 'trash') return it.status === filter;
+  if (it.space === 'work') return false;
   if (filter === 'inbox') return it.status === 'open' && it.inbox;
+  if (filter === 'projects') return it.isProject && ['open', 'waiting', 'later'].includes(it.status);
   return it.status === filter;
 }
 
@@ -26,7 +31,7 @@ export default function Everything({ filter, setFilter }) {
     let out = items.filter((it) => (nq ? true : matches(it, filter)));
     if (nq) {
       // Search looks everywhere except deleted, unless you're in Deleted.
-      out = out.filter((it) => (filter === 'trash' ? it.status === 'trash' : it.status !== 'trash'));
+      out = out.filter((it) => (filter === 'trash' ? it.status === 'trash' : it.status !== 'trash' && it.space !== 'work'));
       out = out.filter((it) => normalizeText([it.title, it.notes, it.lastAction, it.nextStep, it.waitingFor, ...it.steps.map((s) => s.title)].join(' ')).includes(nq));
     }
     if (area) out = out.filter((it) => it.area === area);
@@ -37,7 +42,7 @@ export default function Everything({ filter, setFilter }) {
 
   return (
     <div className="screen everything">
-      <h1 className="screen-title">{t('navAll')}</h1>
+      <h1 className="screen-title">{t('navMine')}</h1>
       <div className="search">
         <Icon.search />
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('searchPlaceholder')} aria-label={t('searchPlaceholder')} />
@@ -46,7 +51,7 @@ export default function Everything({ filter, setFilter }) {
       <div className="tabs scroll-x" role="tablist" aria-label={t('navAll')}>
         {FILTERS.map((f) => (
           <button key={f} type="button" role="tab" aria-selected={filter === f} className={`tab ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>
-            {t('filter_' + f)}
+            {f === 'projects' ? t('projectsFilter') : t('filter_' + f)}
             {counts[f] > 0 && <span className="count">{formatNumber(counts[f], lang)}</span>}
           </button>
         ))}
@@ -75,7 +80,9 @@ export default function Everything({ filter, setFilter }) {
         </div>
       )}
 
-      {list.length ? (
+      {filter === 'projects' && !q ? (
+        <Projects embedded />
+      ) : list.length ? (
         <ul className="item-list">{list.map((it) => <ItemRow key={it.id} it={it} />)}</ul>
       ) : (
         <p className="empty-note">{q ? t('noResults') : t('listEmpty_' + filter)}</p>

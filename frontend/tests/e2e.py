@@ -108,7 +108,7 @@ with sync_playwright() as p:
     pg.screenshot(path=f"{SHOTS}/today-filled.png", full_page=True)
 
     # Open an item and edit it
-    pg.click(".tabbar >> text=كل حاجة")
+    pg.click(".tabbar >> text=حاجاتي")
     pg.wait_for_selector(".everything")
     check("Everything lists 5 open items", pg.locator(".item-list .item-row").count() == 5)
     pg.fill("input[type=search]", "اسكتش")
@@ -122,6 +122,8 @@ with sync_playwright() as p:
     pg.keyboard.press("Enter")
     check("custom step added", pg.locator(".steps li").count() == 4)
     pg.locator(".steps .check").first.click()
+    check("item sheet starts simple (details folded)", pg.locator("#item-repeat").count() == 0)
+    pg.click("text=تفاصيل أكتر")
     pg.fill("#item-next", "أكمل تحبير الشجر")
     pg.fill("#item-notes", "ألوان: زيتوني وكريمي")
     pg.click("text=دي مشروع كبير")
@@ -133,6 +135,7 @@ with sync_playwright() as p:
 
     # Recurring: set weekly on groceries, complete, should roll forward
     pg.click("text=عيش ولبن وبيض")
+    pg.click("text=تفاصيل أكتر")
     pg.select_option("#item-repeat", "weekly")
     due_before = pg.input_value("#item-due")
     pg.click(".sheet-actions >> text=خلصت")
@@ -154,6 +157,7 @@ with sync_playwright() as p:
 
     # Waiting
     pg.click("text=reply to Sara")
+    pg.click("text=تفاصيل أكتر")
     pg.click("text=مستنية حد؟")
     pg.fill("#item-waiting", "سارة تبعت الملف")
     pg.keyboard.press("Escape")
@@ -201,7 +205,8 @@ with sync_playwright() as p:
     pg.wait_for_timeout(400)
 
     # Projects screen shows memory
-    pg.click(".tabbar >> text=مشاريعي")
+    pg.click(".tabbar >> text=حاجاتي")
+    pg.click(".tab >> text=مشاريع")
     pg.wait_for_selector(".project-card")
     check("project card shows its saved next step", pg.locator(".project-card", has_text="أكمل تحبير الشجر").count() == 1)
     saved = {i["title"]: i for i in stored_items(pg)}
@@ -305,7 +310,7 @@ with sync_playwright() as p:
     pg.goto(URL)
     pg.wait_for_selector(".today")
     ok = True
-    for h in ["#today", "#all", "#projects", "#more"]:
+    for h in ["#today", "#all", "#all/projects", "#work", "#more"]:
         pg.goto(URL + h)
         pg.wait_for_timeout(200)
         ok = ok and no_hscroll(pg)

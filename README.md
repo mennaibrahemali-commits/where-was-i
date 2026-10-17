@@ -5,16 +5,20 @@ calls, messages, appointments, errands, home, work and creative projects.
 Egyptian Arabic by default, with an English toggle. Built on JumpyBrain (see
 [NOTICE.md](./NOTICE.md)).
 
-- **Runs with no server, no account, no paid service.** Everything is saved on
-  the device (IndexedDB) and works offline after the first visit.
-- **Data stays on one device.** It does not sync between your phone and your
-  laptop. Use *More → Backup* to export a file (or copy the backup as text) and
-  restore it on another device.
+- **Accounts (optional):** built with Supabase (free tier) settings, people
+  sign up with email + password and their things are saved to their account,
+  available on any device. Database rules (`supabase/setup.sql`) make sure each
+  person can only read and change their own data. Without those settings the
+  app runs with no accounts and keeps everything on the device.
+- **Works offline either way:** everything is also kept on the device
+  (IndexedDB) and syncs when the connection is back.
 - What it does: one-field quick capture (with optional voice), a calm Today
-  screen, "What next?" with visible reasons, optional energy check-in, tiny
-  steps, 2/5/15/25-minute gentle timer, recurring items, waiting-for, later,
-  project memory (last action, next tiny step, notes, links), search, filters,
-  undo, archive, a recoverable Deleted list, daily automatic copies, stickers.
+  screen with "What next?" and its reasons, an "important today" reminder,
+  tiny steps, a 2/5/15/25-minute focus timer that rings an alarm at the end,
+  reminders at a set time plus "add to phone calendar", recurring items,
+  waiting-for, later, project memory, a separate **Work** pipeline board
+  (new → working → waiting on client → revisions → delivered), search,
+  filters, undo, archive, a recoverable Deleted list, backups, stickers.
 
 ## Run it on your computer
 
@@ -22,12 +26,16 @@ Egyptian Arabic by default, with an English toggle. Built on JumpyBrain (see
 cd frontend
 npm install
 npm run dev          # open the address it prints
-npm test             # logic tests
+npm test             # logic + database-rules tests
 npm run build        # production build in frontend/dist
 npx vite preview --port 4173 & npm run test:e2e   # browser tests (needs Python Playwright)
+# accounts, against a local stand-in for Supabase:
+node tests/mock_supabase.mjs 54321 &
+VITE_SUPABASE_URL=http://localhost:54321 VITE_SUPABASE_ANON_KEY=test npx vite build --outDir dist-cloud
+npx vite preview --outDir dist-cloud --port 4174 & python3 tests/e2e_cloud.py
 ```
 
-Deploying for free: see [DEPLOY-ar.md](./DEPLOY-ar.md).
+Deploying for free (GitHub + Supabase + Vercel): see [DEPLOY-ar.md](./DEPLOY-ar.md).
 
 ---
 

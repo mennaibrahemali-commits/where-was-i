@@ -8,8 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node --test tests/logic.test.js",
-    "test:e2e": "python3 tests/e2e.py http://localhost:4173/",
+    "test": "node --test tests/logic.test.js tests/rls.test.mjs",
+    "test:e2e": "python3 tests/e2e.py http://localhost:4173/ && python3 tests/e2e_v2.py http://localhost:4173/",
     "build:demo": "DEMO=1 vite build"
   },
   "dependencies": {
@@ -20,6 +20,7 @@
     "@fullcalendar/interaction": "^6.1.19",
     "@fullcalendar/react": "^6.1.19",
     "@fullcalendar/timegrid": "^6.1.19",
+    "@supabase/supabase-js": "^2.118.0",
     "@tanstack/react-query": "^5.28.0",
     "axios": "^1.6.8",
     "firebase": "^12.4.0",
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^6.0.0",
+    "@electric-sql/pglite": "^0.5.10",
     "@eslint/js": "^9.36.0",
     "@types/node": "^20.11.5",
     "@types/react": "^19.0.0",

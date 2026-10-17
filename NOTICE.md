@@ -21,6 +21,12 @@
   `frontend/src/components/`), backend, Chrome extension and ML service are
   kept unchanged in the repository but are not used by where was i?.
 
+## Further changes (17 October 2026, later)
+
+- Optional accounts and sync with Supabase (`frontend/src/wwi/lib/cloud.js`,
+  `sync.js`, `supabase/setup.sql`), a separate Work pipeline board, a
+  ringing alarm when focus time ends, reminders, and a simpler item screen.
+
 ## If you host it for other people (AGPL section 13)
 
 Anyone who uses a hosted copy must be offered the source code of that exact

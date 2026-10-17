@@ -19,6 +19,7 @@ export function ItemMeta({ it }) {
     const passed = daysBetween(today, it.dueAt) < 0;
     parts.push(<span key="d" className={`meta-due ${daysBetween(today, it.dueAt) <= 0 ? 'soon' : ''}`}>{passed ? t('duePassedLabel', { d: dueLabel(it.dueAt, t, lang) }) : dueLabel(it.dueAt, t, lang)}</span>);
   }
+  if (it.remindAt && ['open', 'waiting'].includes(it.status)) parts.push(<span key="b" className="meta-icon"><Icon.bell /><span dir="ltr">{it.remindAt}</span></span>);
   if (it.recurrence) parts.push(<span key="r" className="meta-icon" title={t('repeat_' + it.recurrence.freq)}><Icon.repeat /><span className="sr-only">{t('repeat_' + it.recurrence.freq)}</span></span>);
   const p = progress(it);
   if (p.total) parts.push(<span key="p">{formatNumber(p.done, lang)}/{formatNumber(p.total, lang)}</span>);

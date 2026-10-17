@@ -9,7 +9,10 @@ import { dueLabel } from '../format.js';
 const SpeechRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
 
 export default function Capture() {
-  const { t, lang, captureOpen, setCaptureOpen, addItem, toast, setOpenItemId } = useApp();
+  const { t, lang, capture, captureOpen, setCaptureOpen, addItem, toast, setOpenItemId } = useApp();
+  // Defaults to where you are (Work screen → work), until you switch it.
+  const [spaceChoice, setSpace] = useState(null);
+  const space = spaceChoice || capture?.space || 'life';
   const [text, setText] = useState('');
   const [area, setArea] = useState(null);        // null = use the guess
   const [due, setDue] = useState(undefined);     // undefined = use the guess
@@ -26,7 +29,7 @@ export default function Capture() {
 
   useEffect(() => {
     if (!captureOpen) {
-      setText(''); setArea(null); setDue(undefined); setSaved([]); setVoiceMsg('');
+      setText(''); setArea(null); setDue(undefined); setSaved([]); setVoiceMsg(''); setSpace(null);
       recRef.current?.abort?.();
       setListening(false);
     }
@@ -35,8 +38,10 @@ export default function Capture() {
   const save = () => {
     const title = text.trim();
     if (!title) return;
-    const it = addItem({ title, area: finalArea, dueAt: finalDue });
-    setSaved((s) => [{ id: it.id, title, area: finalArea }, ...s].slice(0, 4));
+    const it = space === 'work'
+      ? addItem({ title, area: 'work', space: 'work', stage: 'new', dueAt: finalDue, inbox: false })
+      : addItem({ title, area: finalArea === 'work' ? 'other' : finalArea, dueAt: finalDue });
+    setSaved((s) => [{ id: it.id, title, area: it.area }, ...s].slice(0, 4));
     setText(''); setArea(null); setDue(undefined);
     toast(t('captureSaved'), { key: 'capture' });
     inputRef.current?.focus();
@@ -72,6 +77,11 @@ export default function Capture() {
   return (
     <Sheet open={captureOpen} onClose={() => setCaptureOpen(false)} title={t('addNew')} labelClose={t('close')} className="capture-sheet">
       <form className="capture-form" onSubmit={(e) => { e.preventDefault(); save(); }}>
+        <div className="lang-switch small space-switch" role="radiogroup" aria-label={t('spaceLabel')}>
+          {['life', 'work'].map((sp) => (
+            <button key={sp} type="button" role="radio" aria-checked={space === sp} className={`seg ${space === sp ? 'on' : ''}`} onClick={() => setSpace(sp)}>{t('space_' + sp)}</button>
+          ))}
+        </div>
         <div className="capture-input-wrap">
           <textarea
             ref={inputRef}
@@ -99,14 +109,14 @@ export default function Capture() {
 
         {text.trim() && (
           <div className="capture-guess">
-            <span className="hint">{t('captureGuess')}</span>
-            <div className="chips scroll-x" role="radiogroup" aria-label={t('areaLabel')}>
-              {AREAS.map((a) => (
+            {space === 'life' && <span className="hint">{t('captureGuess')}</span>}
+            {space === 'life' && <div className="chips scroll-x" role="radiogroup" aria-label={t('areaLabel')}>
+              {AREAS.filter((a) => a !== 'work').map((a) => (
                 <button key={a} type="button" role="radio" aria-checked={finalArea === a} className={`chip small ${finalArea === a ? 'on' : ''}`} onClick={() => setArea(a)}>
                   <span className={`dot area-${a}`} aria-hidden="true" />{t('area_' + a)}
                 </button>
               ))}
-            </div>
+            </div>}
             <div className="chips" role="radiogroup" aria-label={t('dueLabel')}>
               {[null, today, (() => { const d = new Date(); d.setDate(d.getDate() + 1); return toISODate(d); })()].map((d) => (
                 <button key={String(d)} type="button" role="radio" aria-checked={finalDue === d} className={`chip small ${finalDue === d ? 'on' : ''}`} onClick={() => setDue(d)}>

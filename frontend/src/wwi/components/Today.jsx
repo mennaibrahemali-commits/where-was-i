@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../store.jsx';
 import { Icon, Sun, Teacup, Sticker } from './art.jsx';
 import { ItemRow } from './ItemRow.jsx';
-import { rankWhatNext, quickWins, resumeCandidate, comingUp } from '../lib/whatNext.js';
-import { toISODate, AREAS, daysBetween } from '../lib/model.js';
+import { rankWhatNext, quickWins, resumeCandidate } from '../lib/whatNext.js';
+import { toISODate, AREAS, daysBetween, dueTodayOrPassed } from '../lib/model.js';
 import { pickDaily, formatNumber } from '../i18n.js';
 import { ago } from '../format.js';
 
@@ -17,7 +17,7 @@ function greetingKey(previousOpen) {
 
 export default function Today({ go }) {
   const app = useApp();
-  const { t, lang, items, settings, updateSettings, previousOpen, stickers } = app;
+  const { t, lang, items, settings, updateSettings, previousOpen, stickers, guestItems, resolveGuestItems } = app;
   const today = toISODate();
   const [minutes, setMinutes] = useState(null);
   const [preferArea, setPreferArea] = useState(null);
@@ -36,13 +36,15 @@ export default function Today({ go }) {
   const resume = useMemo(() => resumeCandidate(items), [items]);
   const resumeItem = resume && resume.id !== pick?.item.id ? resume : null;
   const wins = useMemo(() => quickWins(items, today, pick?.item.id), [items, today, pick]);
-  const soon = useMemo(
-    () => comingUp(items, today, [pick?.item.id, resumeItem?.id, ...wins.map((w) => w.id)].filter(Boolean)),
-    [items, today, pick, resumeItem, wins],
+  // Due today (or forgotten from before), important first — a gentle nudge, never red.
+  const todayList = useMemo(
+    () => dueTodayOrPassed(items, today).filter((it) => it.id !== pick?.item.id && !wins.some((w) => w.id === it.id)).slice(0, 4),
+    [items, today, pick, wins],
   );
-  const waiting = items.filter((i) => i.status === 'waiting').length;
-  const inbox = items.filter((i) => i.status === 'open' && i.inbox).length;
-  const anyOpen = items.some((i) => i.status === 'open');
+  const anyImportant = todayList.some((i) => i.important);
+  const waiting = items.filter((i) => i.status === 'waiting' && i.space !== 'work').length;
+  const inbox = items.filter((i) => i.status === 'open' && i.inbox && i.space !== 'work').length;
+  const anyOpen = items.some((i) => i.status === 'open' && i.space !== 'work');
   const allSkipped = !pick && anyOpen && skipped.size > 0;
 
   const setEnergy = (e) => updateSettings({ energy: e, energyDate: today });
@@ -83,6 +85,22 @@ export default function Today({ go }) {
           {energy && <span className={`energy-pill e-${energy}`}><span className="energy-bars" aria-hidden="true"><i /><i /><i /></span>{t('energyNow', { e: t('energy_' + energy) })}</span>}
           <button type="button" className="link-btn" onClick={() => updateSettings({ energy: null, energyDate: null })}>{energy ? t('energyChange') : t('energyQ')}</button>
         </div>
+      )}
+
+      {guestItems.length > 0 && (
+        <div className="confirm guest" role="region" aria-label={t('accountTitle')}>
+          <p>{t('guestFound', { n: formatNumber(guestItems.length, lang) })}</p>
+          <button type="button" className="btn primary small" onClick={() => resolveGuestItems(true)}>{t('guestAdd')}</button>
+          <button type="button" className="btn ghost small" onClick={() => resolveGuestItems(false)}>{t('guestSkip')}</button>
+        </div>
+      )}
+
+      {todayList.length > 0 && (
+        <section className={`today-card ${anyImportant ? 'important' : ''}`} aria-labelledby="today-h">
+          <h2 id="today-h" className="small-h">{anyImportant ? t('importantTodayTitle') : t('dueTodayTitle')}</h2>
+          {anyImportant && <p className="hint">{t('importantTodaySub')}</p>}
+          <ul className="item-list">{todayList.map((it) => <ItemRow key={it.id} it={it} />)}</ul>
+        </section>
       )}
 
       {/* What next — the one suggestion */}
@@ -164,12 +182,7 @@ export default function Today({ go }) {
         </section>
       )}
 
-      {soon.length > 0 && (
-        <section className="list-section" aria-labelledby="soon-h">
-          <h2 id="soon-h" className="small-h">{t('comingUpTitle')}</h2>
-          <ul className="item-list">{soon.map((it) => <ItemRow key={it.id} it={it} />)}</ul>
-        </section>
-      )}
+
 
       {(waiting > 0 || inbox > 0) && (
         <div className="gentle-lines">

@@ -4,29 +4,11 @@ import { Sheet } from './ui.jsx';
 import { Icon } from './art.jsx';
 import { firstOpenStep } from '../lib/model.js';
 import { formatNumber } from '../i18n.js';
+import { unlockAudio, startAlarm, keepScreenOn, releaseScreen, notify } from '../lib/alarm.js';
 
 // A gentle timer: pausing or stopping early is always fine, nothing is lost.
 // Time is kept as an end timestamp so it stays right if the phone sleeps.
 const MODES = [2, 5, 15, 25];
-
-function chime() {
-  try {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    const ctx = new Ctx();
-    [660, 880].forEach((f, i) => {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.frequency.value = f;
-      o.type = 'sine';
-      g.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.25);
-      g.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + i * 0.25 + 0.03);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.25 + 0.6);
-      o.connect(g).connect(ctx.destination);
-      o.start(ctx.currentTime + i * 0.25);
-      o.stop(ctx.currentTime + i * 0.25 + 0.7);
-    });
-  } catch { /* sound is optional */ }
-}
 
 export default function Focus() {
   const { t, lang, focus, setFocus, items, markStarted, updateItem, complete, toast, settings } = useApp();
@@ -39,6 +21,22 @@ export default function Focus() {
   const [lastAction, setLastAction] = useState('');
   const [nextStep, setNextStep] = useState('');
   const announced = useRef(false);
+  const stopAlarmRef = useRef(null);
+
+  const silence = () => { stopAlarmRef.current?.(); stopAlarmRef.current = null; };
+
+  // Keep the screen on while timing; browsers drop the lock when the app is
+  // hidden, so take it again on return.
+  useEffect(() => {
+    if (stage !== 'running') { releaseScreen(); return undefined; }
+    keepScreenOn();
+    const onVis = () => { if (document.visibilityState === 'visible') keepScreenOn(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [stage]);
+
+  // Stop any ringing when the timer sheet goes away.
+  useEffect(() => () => { silence(); releaseScreen(); }, []);
 
   useEffect(() => {
     if (focus) {
@@ -62,13 +60,16 @@ export default function Focus() {
     if (stage === 'running' && pausedLeft == null && endAt && now >= endAt && !announced.current) {
       announced.current = true;
       setStage('ended');
-      if (settings.playful) chime();
+      stopAlarmRef.current = startAlarm({ sound: settings.alarmSound !== false });
+      if (document.visibilityState === 'hidden') notify(t('timerDoneTitle'), it?.title || '', 'timer');
     }
-  }, [now, endAt, stage, pausedLeft, settings.playful]);
+  }, [now, endAt, stage, pausedLeft, settings.alarmSound, t, it?.title]);
 
   if (!focus || !it) return null;
 
   function begin(mins) {
+    unlockAudio(); // must happen on the tap, so the alarm is allowed to ring later
+    silence();
     const ms = mins * 60000;
     setTotal(ms);
     setEndAt(Date.now() + ms);
@@ -84,12 +85,13 @@ export default function Focus() {
   const resume = () => { setEndAt(Date.now() + pausedLeft); setNow(Date.now()); setPausedLeft(null); };
   const extend = () => begin(5);
   const stopToMemory = () => {
+    silence();
     const step = firstOpenStep(it);
     setLastAction(it.lastAction || '');
     setNextStep(it.nextStep || (step ? step.title : ''));
     setStage('memory');
   };
-  const close = () => setFocus(null);
+  const close = () => { silence(); releaseScreen(); setFocus(null); };
   const saveMemory = () => {
     updateItem(it.id, { lastAction: lastAction.trim() || it.lastAction, nextStep: nextStep.trim(), touchedAt: new Date().toISOString() });
     close();
@@ -138,7 +140,7 @@ export default function Focus() {
             </svg>
             <div className="ring-clock" dir="ltr">{clock}</div>
           </div>
-          {pausedLeft != null && <p className="hint center">{t('focusPaused')}</p>}
+          {pausedLeft != null ? <p className="hint center">{t('focusPaused')}</p> : <p className="hint center">{t('timerKeepOpen')}</p>}
           <div className="focus-actions">
             {pausedLeft == null
               ? <button type="button" className="btn" onClick={pause}><Icon.pause />{t('pause')}</button>
@@ -150,8 +152,9 @@ export default function Focus() {
       )}
 
       {stage === 'ended' && (
-        <div className="focus-ended">
+        <div className="focus-ended" role="alert">
           <h3>{t('focusEnd')}</h3>
+          <button type="button" className="btn wide stop-alarm" onClick={silence}><Icon.bell />{t('stopAlarm')}</button>
           <p>{t('focusEndBody')}</p>
           <div className="focus-actions">
             <button type="button" className="btn" onClick={extend}>{t('keepGoing')}</button>

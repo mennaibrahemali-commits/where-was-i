@@ -100,40 +100,62 @@ export async function set(key, value) {
   }
 }
 
-export async function loadState() {
-  return get(MAIN_KEY);
+// Each account gets its own copy on the device ("state:<user id>");
+// "state" is the copy used without an account.
+export const GUEST_KEY = 'state';
+export const userKey = (userId) => (userId ? `state:${userId}` : GUEST_KEY);
+
+export async function loadState(key = MAIN_KEY) {
+  return get(key);
 }
 
-export async function saveState(state) {
-  return set(MAIN_KEY, state);
+export async function saveState(state, key = MAIN_KEY) {
+  return set(key, state);
 }
+
+export async function removeState(key) {
+  try { await idbDelete(key); } catch { /* ignore */ }
+  try { localStorage.removeItem(LS_PREFIX + key); } catch { /* ignore */ }
+}
+
+const backupPrefix = (key) => (key === MAIN_KEY ? 'backup-' : `backup-${key}-`);
 
 // One automatic snapshot per day, keeping the last few days.
-export async function dailyBackup(state, todayISO) {
-  const key = 'backup-' + todayISO;
+export async function dailyBackup(state, todayISO, key = MAIN_KEY) {
+  const prefix = backupPrefix(key);
+  const bkey = prefix + todayISO;
   try {
-    const keys = (await idbKeys()).filter((k) => k.startsWith('backup-')).sort();
-    if (!keys.includes(key)) {
-      await idbSet(key, { ...state, backedUpAt: new Date().toISOString() });
-      keys.push(key);
+    const keys = (await idbKeys()).filter((k) => k.startsWith(prefix) && /\d{4}-\d{2}-\d{2}$/.test(k) && k.length === prefix.length + 10).sort();
+    if (!keys.includes(bkey)) {
+      await idbSet(bkey, { ...state, backedUpAt: new Date().toISOString() });
+      keys.push(bkey);
     }
     const old = keys.sort().slice(0, Math.max(0, keys.length - BACKUP_DAYS));
     await Promise.all(old.map(idbDelete));
   } catch { /* backups are a bonus, never block the app */ }
 }
 
-export async function listBackups() {
+export async function listBackups(key = MAIN_KEY) {
+  const prefix = backupPrefix(key);
   try {
-    const keys = (await idbKeys()).filter((k) => k.startsWith('backup-')).sort().reverse();
+    const keys = (await idbKeys()).filter((k) => k.startsWith(prefix) && k.length === prefix.length + 10).sort().reverse();
     const out = [];
     for (const k of keys) {
       const v = await idbGet(k);
-      out.push({ key: k, date: k.slice(7), count: (v?.items || []).length, data: v });
+      out.push({ key: k, date: k.slice(prefix.length), count: (v?.items || []).length, data: v });
     }
     return out;
   } catch {
     return [];
   }
+}
+
+export async function removeBackups(key) {
+  const prefix = backupPrefix(key);
+  try {
+    const keys = (await idbKeys()).filter((k) => k.startsWith(prefix) && k.length === prefix.length + 10);
+    await Promise.all(keys.map(idbDelete));
+  } catch { /* ignore */ }
 }
 
 // Ask the browser not to clear this site's data under storage pressure.

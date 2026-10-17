@@ -126,3 +126,92 @@ test('normalizeItem repairs partial data', () => {
   assert.equal(it.steps.length, 1);
   assert.ok(it.steps[0].id);
 });
+
+// ── v2: work space, reminders ─────────────────────────────────────────────
+import { setStage, dueTodayOrPassed } from '../src/wwi/lib/model.js';
+import { dueReminders, reminderKey, importantLeftToday, shouldNudge, buildICS } from '../src/wwi/lib/reminders.js';
+
+test('work items never appear in daily suggestions', () => {
+  const work = createItem({ title: 'client logo', space: 'work', stage: 'doing', dueAt: TODAY, important: true });
+  const life = createItem({ title: 'buy bread', area: 'groceries' });
+  const ranked = rankWhatNext([work, life], { today: TODAY });
+  assert.deepEqual(ranked.map((r) => r.item.id), [life.id]);
+  assert.equal(quickWins([work, life], TODAY).some((i) => i.id === work.id), false);
+  assert.equal(dueTodayOrPassed([work], TODAY).length, 0);
+});
+
+test('pipeline: delivered closes, moving back reopens', () => {
+  const w = createItem({ title: 'poster', space: 'work', stage: 'revisions' });
+  const d = setStage(w, 'delivered', now);
+  assert.equal(d.status, 'done');
+  assert.ok(d.completedAt);
+  const back = setStage(d, 'revisions', now);
+  assert.equal(back.status, 'open');
+  assert.equal(back.completedAt, null);
+  assert.equal(normalizeItem({ id: 'w', title: 'x', space: 'work' }).stage, 'new');
+  assert.equal(normalizeItem({ id: 'l', title: 'x', stage: 'doing' }).stage, null);
+});
+
+test('reminders fire once at their time, missed ones fire on next open', () => {
+  const it = createItem({ title: 'pay rent', dueAt: TODAY, remindAt: '11:30' });
+  assert.equal(dueReminders([it], new Date(2026, 9, 17, 11, 0), []).length, 0, 'not yet');
+  assert.equal(dueReminders([it], new Date(2026, 9, 17, 11, 30), []).length, 1, 'on time');
+  assert.equal(dueReminders([it], new Date(2026, 9, 17, 18, 0), []).length, 1, 'missed, shown when opened later');
+  assert.equal(dueReminders([it], new Date(2026, 9, 17, 18, 0), [reminderKey(it)]).length, 0, 'only once');
+  assert.equal(dueReminders([{ ...it, status: 'done' }], new Date(2026, 9, 17, 12, 0), []).length, 0, 'done = silent');
+});
+
+test('important-left nudge: once a day after its time', () => {
+  const imp = createItem({ title: 'send invoice', important: true, dueAt: '2026-10-16' });
+  const notImp = createItem({ title: 'x', dueAt: TODAY });
+  assert.deepEqual(importantLeftToday([imp, notImp], TODAY).map((i) => i.id), [imp.id]);
+  assert.equal(shouldNudge(new Date(2026, 9, 17, 17, 59), '18:00', null), false);
+  assert.equal(shouldNudge(new Date(2026, 9, 17, 18, 1), '18:00', null), true);
+  assert.equal(shouldNudge(new Date(2026, 9, 17, 20, 0), '18:00', TODAY), false);
+});
+
+test('calendar file has a timed alarm and repeat rule', () => {
+  const it = createItem({ title: 'دوا, الصبح', dueAt: TODAY, remindAt: '08:15', recurrence: { freq: 'daily', interval: 1 } });
+  const ics = buildICS(it, { now, alarmText: 'فكّري' });
+  assert.match(ics, /DTSTART:20261017T081500/);
+  assert.match(ics, /RRULE:FREQ=DAILY;INTERVAL=1/);
+  assert.match(ics, /BEGIN:VALARM[\s\S]*TRIGGER:PT0M/);
+  assert.match(ics, /SUMMARY:دوا\\, الصبح/);
+  assert.ok(ics.split('\r\n').every((l) => new TextEncoder().encode(l).length <= 75));
+  assert.match(buildICS(createItem({ title: 'x', dueAt: TODAY }), { now }), /DTSTART;VALUE=DATE:20261017/);
+});
+
+// ── v2: sync merge rules ──────────────────────────────────────────────────
+import { mergeRemoteItems, mergeStickers, latestStamp, pickSyncedSettings } from '../src/wwi/lib/sync.js';
+
+test('sync: newer copy wins, unsent local changes are never overwritten', () => {
+  const a = createItem({ title: 'a', updatedAt: '2026-10-17T10:00:00Z' });
+  const b = createItem({ title: 'b', updatedAt: '2026-10-17T10:00:00Z' });
+  const rows = [
+    { id: a.id, data: { ...a, title: 'a from phone', updatedAt: '2026-10-17T11:00:00Z' }, updated_at: 's1' },
+    { id: b.id, data: { ...b, title: 'b old', updatedAt: '2026-10-17T09:00:00Z' }, updated_at: 's2' },
+    { id: 'new-1', data: { id: 'new-1', title: 'from laptop', updatedAt: '2026-10-17T08:00:00Z' }, updated_at: 's3' },
+    { id: '__settings', data: { lang: 'en' }, updated_at: 's4' },
+  ];
+  const r = mergeRemoteItems([a, b], rows);
+  const byId = Object.fromEntries(r.items.map((i) => [i.id, i.title]));
+  assert.equal(byId[a.id], 'a from phone');
+  assert.equal(byId[b.id], 'b', 'older remote ignored');
+  assert.equal(byId['new-1'], 'from laptop');
+  assert.equal(r.items.length, 3, 'settings doc is not an item');
+  const kept = mergeRemoteItems([a], rows.slice(0, 1), new Set([a.id]));
+  assert.equal(kept.items[0].title, 'a', 'dirty local change kept');
+  assert.equal(kept.changed, false);
+});
+
+test('sync: purged markers remove the item on other devices', () => {
+  const a = createItem({ title: 'gone', status: 'trash' });
+  const r = mergeRemoteItems([a], [{ id: a.id, data: { purged: true, updatedAt: 'z' } }]);
+  assert.equal(r.items.length, 0);
+});
+
+test('sync helpers', () => {
+  assert.equal(mergeStickers([{ id: '1' }], [{ id: '1' }, { id: '2' }]).length, 2);
+  assert.equal(latestStamp([{ updated_at: '2026-01-02' }, { updated_at: '2026-01-05' }], '2026-01-03'), '2026-01-05');
+  assert.deepEqual(pickSyncedSettings({ lang: 'ar', energy: 'low', theme: 'mint' }), { lang: 'ar', theme: 'mint' });
+});

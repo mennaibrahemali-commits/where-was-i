@@ -14,6 +14,10 @@ export const STATUSES = ['open', 'later', 'waiting', 'done', 'archived', 'trash'
 
 export const ENERGY = ['low', 'normal', 'high'];
 
+// Work lives in its own space with a pipeline, kept out of daily-life views.
+export const SPACES = ['life', 'work'];
+export const STAGES = ['new', 'doing', 'client', 'revisions', 'delivered'];
+
 export function uid() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -63,6 +67,10 @@ export function createItem(partial = {}, now = new Date()) {
     status: 'open',
     inbox: true,            // just captured, not looked at yet
     isProject: false,
+    space: 'life',          // 'life' | 'work'
+    stage: null,            // work pipeline stage (see STAGES)
+    client: '',             // work: who it's for
+    remindAt: null,         // 'HH:MM' on the due day (or today)
     dueAt: null,            // 'YYYY-MM-DD'
     recurrence: null,       // { freq: 'daily'|'weekly'|'monthly', interval: 1 }
     estimateMins: null,
@@ -155,6 +163,32 @@ export function isActive(it) {
   return it.status === 'open';
 }
 
+export function isLife(it) {
+  return it.space !== 'work';
+}
+
+// Things that matter today: due today or earlier and still open, important first.
+export function dueTodayOrPassed(items, today) {
+  return items
+    .filter((it) => isLife(it) && ['open', 'waiting'].includes(it.status) && it.dueAt && daysBetween(today, it.dueAt) <= 0)
+    .sort((a, b) => Number(b.important) - Number(a.important) || a.dueAt.localeCompare(b.dueAt));
+}
+
+// Move a work item along the pipeline. "Delivered" closes it; moving back reopens it.
+export function setStage(item, stage, now = new Date()) {
+  const stamp = now.toISOString();
+  const next = { ...item, stage, inbox: false, updatedAt: stamp, touchedAt: stamp };
+  if (stage === 'delivered') {
+    next.status = 'done';
+    next.completedAt = stamp;
+    next.completions = [...(item.completions || []), stamp];
+  } else if (item.status === 'done') {
+    next.status = 'open';
+    next.completedAt = null;
+  }
+  return next;
+}
+
 export function progress(it) {
   const total = it.steps.length;
   const done = it.steps.filter((s) => s.done).length;
@@ -171,6 +205,10 @@ export function normalizeItem(raw) {
   const it = { ...base, ...raw };
   if (!AREAS.includes(it.area)) it.area = 'other';
   if (!STATUSES.includes(it.status)) it.status = 'open';
+  if (!SPACES.includes(it.space)) it.space = 'life';
+  if (it.space === 'work' && !STAGES.includes(it.stage)) it.stage = it.status === 'done' ? 'delivered' : 'new';
+  if (it.space !== 'work') it.stage = null;
+  if (it.remindAt && !/^\d{2}:\d{2}$/.test(it.remindAt)) it.remindAt = null;
   it.steps = Array.isArray(it.steps)
     ? it.steps.filter((s) => s && typeof s.title === 'string').map((s) => ({ id: s.id || uid(), title: s.title, done: !!s.done }))
     : [];

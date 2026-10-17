@@ -5,11 +5,11 @@ import { progress, firstOpenStep } from '../lib/model.js';
 import { ago } from '../format.js';
 import { formatNumber } from '../i18n.js';
 
-export default function Projects() {
+export default function Projects({ embedded = false }) {
   const { t, lang, items, addItem, setOpenItemId, setFocus } = useApp();
   const [name, setName] = useState('');
   const projects = items
-    .filter((it) => it.isProject && ['open', 'waiting', 'later'].includes(it.status))
+    .filter((it) => it.isProject && it.space !== 'work' && ['open', 'waiting', 'later'].includes(it.status))
     .sort((a, b) => (b.touchedAt || b.updatedAt).localeCompare(a.touchedAt || a.updatedAt));
 
   const create = (e) => {
@@ -22,8 +22,8 @@ export default function Projects() {
   };
 
   return (
-    <div className="screen projects">
-      <h1 className="screen-title">{t('projectsTitle')}</h1>
+    <div className={embedded ? 'projects embedded' : 'screen projects'}>
+      {!embedded && <h1 className="screen-title">{t('projectsTitle')}</h1>}
       <p className="sub">{t('projectsSub')}</p>
 
       <form className="inline-add big" onSubmit={create}>

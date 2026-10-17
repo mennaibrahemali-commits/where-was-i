@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../store.jsx';
 import { Chips, Toggle } from './ui.jsx';
-import { Sticker } from './art.jsx';
+import { Sticker, Icon } from './art.jsx';
 import { buildExport, exportFileName, parseImport, mergeItems } from '../lib/backup.js';
 import { listBackups, set as storageSet } from '../lib/storage.js';
 import { formatNumber } from '../i18n.js';
 import { formatDate } from '../format.js';
+import { playBellOnce, unlockAudio, askNotificationPermission, notificationPermission } from '../lib/alarm.js';
 
 const UPSTREAM = 'https://github.com/tanay9098/JumpyBrain';
 // AGPL §13: if you host a modified version, point this at your own source.
@@ -30,7 +31,11 @@ export default function More({ section }) {
   const backupTextRef = useRef(null);
   const jarRef = useRef(null);
 
-  useEffect(() => { listBackups().then(setBackups); }, []);
+  const [notif, setNotif] = useState(notificationPermission);
+  const [signOutPending, setSignOutPending] = useState(0);
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => { listBackups(app.storeKey).then(setBackups); }, [app.storeKey]);
   useEffect(() => {
     if (section === 'jar') jarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [section]);
@@ -108,9 +113,35 @@ export default function More({ section }) {
     toast(t('importDone', { n: formatNumber(b.count, lang) }));
   };
 
+  const doSignOut = async (force = false) => {
+    setSigningOut(true);
+    const r = await app.signOut({ force });
+    setSigningOut(false);
+    if (r?.pending) setSignOutPending(r.pending);
+  };
+
   return (
     <div className="screen more">
       <h1 className="screen-title">{t('moreTitle')}</h1>
+
+      {app.user && (
+        <section className="panel account" aria-labelledby="acct-h">
+          <h2 id="acct-h" className="small-h">{t('accountTitle')}</h2>
+          <p className="note" dir="auto">{t('signedInAs', { email: app.user.email })}</p>
+          <p className={`sync-line s-${app.syncState}`} role="status"><span className="sync-dot" aria-hidden="true" />{t('sync_' + app.syncState)}</p>
+          <div className="row-actions">
+            <button type="button" className="btn small" onClick={() => app.syncNow()} disabled={app.syncState === 'syncing'}>{t('syncNow')}</button>
+            <button type="button" className="btn ghost small" onClick={() => doSignOut(false)} disabled={signingOut}>{signingOut ? t('authWorking') : t('signOut')}</button>
+          </div>
+          {signOutPending > 0 && (
+            <div className="confirm" role="alertdialog" aria-label={t('signOut')}>
+              <p>{t('signOutPending', { n: formatNumber(signOutPending, lang) })}</p>
+              <button type="button" className="btn primary small" onClick={() => setSignOutPending(0)}>{t('stay')}</button>
+              <button type="button" className="btn ghost small danger" onClick={() => doSignOut(true)}>{t('signOutAnyway')}</button>
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="panel" aria-labelledby="look-h">
         <h2 id="look-h" className="small-h">{t('language')}</h2>
@@ -137,9 +168,27 @@ export default function More({ section }) {
         <Toggle label={t('playful')} hint={t('playfulHint')} checked={settings.playful} onChange={(v) => updateSettings({ playful: v })} />
       </section>
 
+      <section className="panel" aria-labelledby="rem-h">
+        <h2 id="rem-h" className="small-h">{t('remindersTitle')}</h2>
+        <Toggle label={t('alarmSound')} checked={settings.alarmSound !== false} onChange={(v) => updateSettings({ alarmSound: v })} />
+        <button type="button" className="btn small" onClick={() => { unlockAudio(); playBellOnce(0.35); }}><Icon.bell />{t('testAlarm')}</button>
+        <Toggle label={t('nudgeLabel')} checked={!!settings.nudgeTime} onChange={(v) => updateSettings({ nudgeTime: v ? '18:00' : null })} />
+        {settings.nudgeTime && (
+          <div className="inline-field">
+            <label className="field-label" htmlFor="nudge-time">{t('nudgeAt')}</label>
+            <input id="nudge-time" type="time" value={settings.nudgeTime} onChange={(e) => updateSettings({ nudgeTime: e.target.value || '18:00', lastNudgeDate: null })} />
+          </div>
+        )}
+        {notif === 'granted' && <p className="hint ok">{t('notifOn')}</p>}
+        {notif === 'default' && <button type="button" className="btn small" onClick={async () => setNotif(await askNotificationPermission())}>{t('notifAllow')}</button>}
+        {notif === 'denied' && <p className="hint">{t('notifBlocked')}</p>}
+        {notif === 'unsupported' && <p className="hint">{t('notifUnsupported')}</p>}
+        <p className="note">{t('remindersNote')}</p>
+      </section>
+
       <section className="panel" aria-labelledby="backup-h">
         <h2 id="backup-h" className="small-h">{t('backupTitle')}</h2>
-        <p className="note">{t('storageNote')}</p>
+        <p className="note">{app.user ? t('storageNoteAccount') : t('storageNote')}</p>
         <div className="row-actions">
           <button type="button" className="btn primary" onClick={doExport}>{t('exportBtn')}</button>
           <button type="button" className="btn" onClick={() => fileRef.current?.click()}>{t('importBtn')}</button>
