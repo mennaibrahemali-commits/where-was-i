@@ -6,6 +6,10 @@
   "installCommand": "npm install",
   "rewrites": [
     {
+      "source": "/little-window",
+      "destination": "/little-window/home.html"
+    },
+    {
       "source": "/little-window/",
       "destination": "/little-window/home.html"
     },
@@ -41,13 +45,6 @@
           "value": "no-cache"
         }
       ]
-    }
-  ],
-  "redirects": [
-    {
-      "source": "/little-window",
-      "destination": "/little-window/",
-      "permanent": false
     }
   ]
 }
