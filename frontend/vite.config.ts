@@ -62,6 +62,8 @@ export default defineConfig({
         // the fresh page when online, the last cached copy when offline.
         navigateFallback: undefined,
         globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
+        // Little Window is a separate app in its own folder; keep it out of this app's cache.
+        globIgnores: ['little-window/**'],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.mode === 'navigate',
